@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       model,
       messages: openAIMessages,
     //   temperature,
-      max_completion_tokens,
+      // max_completion_tokens,
     });
 
     const assistantMessage = {
