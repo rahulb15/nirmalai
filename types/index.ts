@@ -5,6 +5,7 @@ export interface Message {
   timestamp: Date;
   imageUrls?: string[];
   fileUrls?: string[];
+  pdfInfo?: PDFInfo[];
 }
 
 export interface ChatRequest {
@@ -34,4 +35,31 @@ export interface FileUploadResponse {
   pageCount?: number;
   isPdf?: boolean;
   error?: string;
+}
+
+
+// Add this new interface for PDF information
+export interface PDFInfo {
+  name: string;
+  pageCount: number;
+  hasImages: boolean;
+  hasText: boolean;
+  conversionSuccess: boolean;
+}
+
+
+
+// Add file upload response types
+export interface UploadResponse {
+  url: string;
+  type: string;
+  name: string;
+  size: number;
+  isPdf?: boolean;
+  pdfImages?: string[];
+  extractedText?: string;
+  pageCount?: number;
+  conversionSuccess?: boolean;
+  processingError?: string;
+  parseWarning?: string;
 }

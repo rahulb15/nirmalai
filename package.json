@@ -18,13 +18,15 @@
     "next": "14.2.5",
     "openai": "^4.52.0",
     "pdf-parse": "^1.1.1",
+    "pdf-poppler": "^0.2.1",
+    "pdf2pic": "^3.2.0",
     "pdfjs-dist": "^5.4.149",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-dropzone": "^14.2.3",
     "react-markdown": "^9.0.1",
     "react-syntax-highlighter": "^15.5.0",
-    "sharp": "^0.33.4",
+    "sharp": "^0.33.5",
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
