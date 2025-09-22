@@ -15,6 +15,7 @@ export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [imageMode, setImageMode] = useState<'analyze' | 'generate'>('analyze');
+    const [processingProgress, setProcessingProgress] = useState<string>(''); // Add this
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -27,39 +28,141 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
+// const handleSendMessage = async (content: string) => {
+//   if (!content.trim() && uploadedFiles.length === 0) return;
+
+//   const imageFiles = uploadedFiles.filter(f => f.type?.startsWith('image/'));
+//   const pdfFiles = uploadedFiles.filter(f => f.isPdf);
+
+//   let enhancedContent = content;
+//   let allImageUrls = [];
+
+//   // Collect regular image URLs
+//   allImageUrls.push(...imageFiles.map(f => f.url));
+
+//   // Collect PDF page images
+//   pdfFiles.forEach(pdf => {
+//     if (pdf.pdfImages && pdf.pdfImages.length > 0) {
+//       allImageUrls.push(...pdf.pdfImages.map((page:any) => page.url));
+//     }
+//   });
+
+//   const userMessage: Message = {
+//     id: generateId(),
+//     role: 'user',
+//     content: content.trim() || 'Uploaded files',
+//     timestamp: new Date(),
+//     imageUrls: allImageUrls,
+//   };
+
+//   setMessages(prev => [...prev, userMessage]);
+//   setIsLoading(true);
+//   setUploadedFiles([]);
+
+//   try {
+//     if (imageMode === 'generate' && content.trim()) {
+//       // Image generation logic (same as before)
+//       const response = await fetch('/api/generate-image', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ prompt: content }),
+//       });
+//       const data = await response.json();
+//       if (data.error) throw new Error(data.error);
+      
+//       setMessages(prev => [...prev, {
+//         id: generateId(),
+//         role: 'assistant',
+//         content: `🎨 Image Generated!\n\n${data.revisedPrompt || content}`,
+//         timestamp: new Date(),
+//         imageUrls: [data.imageUrl],
+//       }]);
+//     }
+//     else if (allImageUrls.length > 0) {
+//       // Image/PDF analysis
+//       const response = await fetch('/api/vision', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({
+//           imageUrls: allImageUrls, // Send all images including PDF pages
+//           prompt: content || 'Analyze these images and extract all text and information',
+//         }),
+//       });
+//       const data = await response.json();
+//       if (data.error) throw new Error(data.error);
+      
+//       setMessages(prev => [...prev, {
+//         id: generateId(),
+//         role: 'assistant',
+//         content: data.description,
+//         timestamp: new Date(),
+//       }]);
+//     }
+//     else {
+//       // Regular chat
+//       const response = await fetch('/api/chat', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ 
+//           messages: [
+//             ...messages.map(m => ({ role: m.role, content: m.content })),
+//             { role: 'user', content: enhancedContent }
+//           ]
+//         }),
+//       });
+//       const data = await response.json();
+//       if (data.error) throw new Error(data.error);
+      
+//       setMessages(prev => [...prev, data.message]);
+//     }
+//   } catch (error: any) {
+//     setMessages(prev => [...prev, {
+//       id: generateId(),
+//       role: 'assistant',
+//       content: `Error: ${error.message}`,
+//       timestamp: new Date(),
+//     }]);
+//   } finally {
+//     setIsLoading(false);
+//   }
+// };
+
+
 const handleSendMessage = async (content: string) => {
   if (!content.trim() && uploadedFiles.length === 0) return;
 
   const imageFiles = uploadedFiles.filter(f => f.type?.startsWith('image/'));
   const pdfFiles = uploadedFiles.filter(f => f.isPdf);
 
-  // Add PDF text to message
-  let enhancedContent = content;
-  if (pdfFiles.length > 0) {
-    const pdfTexts = pdfFiles
-      .filter(pdf => pdf.extractedText)
-      .map(pdf => `\n\n[PDF: ${pdf.name}]\n${pdf.extractedText}`)
-      .join('\n');
-    
-    enhancedContent = content + pdfTexts;
-  }
+  let allImageUrls = [];
+  allImageUrls.push(...imageFiles.map(f => f.url));
+
+  pdfFiles.forEach(pdf => {
+    if (pdf.pdfImages && pdf.pdfImages.length > 0) {
+      allImageUrls.push(...pdf.pdfImages.map((page:any) => page.url));
+    }
+  });
 
   const userMessage: Message = {
     id: generateId(),
     role: 'user',
     content: content.trim() || 'Uploaded files',
     timestamp: new Date(),
-    imageUrls: imageFiles.map(f => f.url),
-    fileUrls: pdfFiles.map(f => f.url),
+    imageUrls: allImageUrls,
   };
 
   setMessages(prev => [...prev, userMessage]);
   setIsLoading(true);
   setUploadedFiles([]);
 
+  // Set processing progress
+  if (allImageUrls.length > 5) {
+    setProcessingProgress(`Processing ${allImageUrls.length} images with parallel batching...`);
+  }
+
   try {
     if (imageMode === 'generate' && content.trim()) {
-      // Image generation...
+      // Image generation
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,35 +179,57 @@ const handleSendMessage = async (content: string) => {
         imageUrls: [data.imageUrl],
       }]);
     }
-    else if (imageFiles.length > 0) {
-      // Image analysis...
-      const response = await fetch('/api/vision', {
+    else if (allImageUrls.length > 0) {
+      // Choose endpoint based on number of images
+      const endpoint = allImageUrls.length > 5 ? '/api/vision-batch' : '/api/vision';
+      
+      console.log(`Using ${endpoint} for ${allImageUrls.length} images`);
+      
+      // Update progress based on strategy
+      if (allImageUrls.length > 10) {
+        setProcessingProgress(`Using smart sampling for ${allImageUrls.length} pages - analyzing key pages...`);
+      } else if (allImageUrls.length > 5) {
+        setProcessingProgress(`Processing ${allImageUrls.length} images in parallel batches...`);
+      }
+      const useCompleteAnalysis = allImageUrls.length <= 20; // Full analysis for 20 or fewer pages
+
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageUrl: imageFiles[0].url,
-          prompt: content || 'Describe this image',
+          imageUrls: allImageUrls,
+          prompt: content || 'Analyze these images and extract all text and information',
+              forceComplete: useCompleteAnalysis // New parameter
         }),
       });
+      
       const data = await response.json();
       if (data.error) throw new Error(data.error);
+      
+      let responseContent = data.description;
+      if (data.strategy === 'sampling') {
+        responseContent += `\n\n⚡ **Fast Analysis**: Analyzed ${data.analyzedPages} key pages out of ${data.totalPages} total pages for quick overview. For complete analysis, upload fewer pages at a time.`;
+      } else if (data.totalPages > 5) {
+        responseContent += `\n\n⚡ **Parallel Processing**: Successfully processed all ${data.totalPages} pages using batch analysis.`;
+      }
       
       setMessages(prev => [...prev, {
         id: generateId(),
         role: 'assistant',
-        content: data.description,
+        content: responseContent,
         timestamp: new Date(),
       }]);
     }
     else {
-      // Regular chat with PDF
+      // Regular chat
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           messages: [
             ...messages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: enhancedContent }
+            { role: 'user', content: content }
           ]
         }),
       });
@@ -113,6 +238,7 @@ const handleSendMessage = async (content: string) => {
       
       setMessages(prev => [...prev, data.message]);
     }
+    
   } catch (error: any) {
     setMessages(prev => [...prev, {
       id: generateId(),
@@ -122,9 +248,9 @@ const handleSendMessage = async (content: string) => {
     }]);
   } finally {
     setIsLoading(false);
+    setProcessingProgress('');
   }
 };
-
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -272,11 +398,21 @@ const handleFileUpload = async (files: File[]) => {
           ) : (
             <MessageList messages={messages} />
           )}
-          {isLoading && (
+          {/* {isLoading && (
             <div className="flex items-center justify-center py-4">
               <div className="animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-white"></div>
             </div>
-          )}
+          )} */}
+          {isLoading && (
+  <div className="flex flex-col items-center justify-center py-4">
+    <div className="animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-white mb-2"></div>
+    {processingProgress && (
+      <p className="text-white/70 text-sm text-center">
+        {processingProgress}
+      </p>
+    )}
+  </div>
+)}
           <div ref={messagesEndRef} />
         </div>
       </div>

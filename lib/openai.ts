@@ -9,8 +9,8 @@ export const openai = new OpenAI({
 });
 
 export const MODELS = {
-  GPT4: 'gpt-5',
-  GPT4_VISION: 'gpt-5',
-  GPT35: 'gpt-5',
+  GPT4: 'gpt-4o',
+  GPT4_VISION: 'gpt-4o',
+  GPT35: 'gpt-4o',
   GPTIMAGE: 'gpt-image-1',
 } as const;
