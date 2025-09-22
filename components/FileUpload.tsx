@@ -19,10 +19,13 @@ export default function FileUpload({ onUpload }: Props) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff'],
       'application/pdf': ['.pdf'],
+      'text/plain': ['.txt'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
-    maxSize: 10 * 1024 * 1024,
+    maxSize: 100 * 1024 * 1024, // 100MB limit
   });
 
   return (
@@ -56,12 +59,12 @@ export default function FileUpload({ onUpload }: Props) {
           </div>
           <div className="flex items-center gap-1">
             <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span>PDF</span>
+            <span>PDF & Docs</span>
           </div>
         </div>
 
         <p className="text-xs text-gray-400 mt-2 sm:mt-3">
-          Max file size: 10MB
+          Max file size: 100MB
         </p>
       </div>
     </div>
