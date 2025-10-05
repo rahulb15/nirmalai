@@ -45,20 +45,12 @@
 //   }
 // }
 
-
 import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary';
 
-// ✅ CRITICAL: Set route segment config for large files
-export const config = {
-  api: {
-    bodyParser: false, // Disable default body parser
-  },
-};
-
-// ✅ Add runtime config for serverless functions
+// ✅ CORRECT: Use new App Router config format
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 60 seconds timeout
+export const maxDuration = 60; // 60 seconds for serverless functions
 
 export async function POST(req: NextRequest) {
   console.log('=== UPLOAD API CALLED ===');
