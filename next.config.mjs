@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
+    images: {
     domains: ['localhost', 'res.cloudinary.com'],
     remotePatterns: [
       {
@@ -13,9 +13,14 @@ const nextConfig = {
       },
     ],
   },
-  api: {
-    bodyParser: {
-      sizeLimit: '100mb',
+  // api: {
+  //   bodyParser: {
+  //     sizeLimit: '100mb',
+  //   },
+  // },
+   experimental: {
+    serverActions: {
+      bodySizeLimit: '100mb',
     },
   },
 };

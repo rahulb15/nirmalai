@@ -1,3 +1,4 @@
+// components\ChatInterface.tsx
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -261,29 +262,75 @@ const handleSendMessage = async (content: string) => {
     }
   };
 
+// const handleFileUpload = async (files: File[]) => {
+//   const uploadPromises = files.map(async (file) => {
+//     const formData = new FormData();
+//     formData.append('file', file);
+
+//     const response = await fetch('/api/upload', {
+//       method: 'POST',
+//       body: formData,
+//     });
+
+//     if (!response.ok) {
+//       throw new Error('Upload failed');
+//     }
+
+//     return response.json(); // This should include extractedText for PDFs
+//   });
+
+//   try {
+//     const results = await Promise.all(uploadPromises);
+//     setUploadedFiles(prev => [...prev, ...results]);
+//   } catch (error) {
+//     console.error('Upload error:', error);
+//     alert('Failed to upload files');
+//   }
+// };
+
 const handleFileUpload = async (files: File[]) => {
   const uploadPromises = files.map(async (file) => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error('Upload failed');
+      const data = await response.json();
+
+      if (!response.ok) {
+        // ✅ Show detailed error with debug info
+        const errorMsg = data.error || 'Upload failed';
+        const debugInfo = data.debug ? JSON.stringify(data.debug, null, 2) : '';
+        
+        console.error('Upload failed:', {
+          error: errorMsg,
+          debug: data.debug,
+          status: response.status
+        });
+        
+        // Show user-friendly alert with technical details
+        alert(`Upload Failed\n\n${errorMsg}\n\n${debugInfo ? `Debug Info:\n${debugInfo}` : ''}`);
+        
+        throw new Error(errorMsg);
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      alert(`Error uploading ${file.name}:\n${error.message}`);
+      throw error;
     }
-
-    return response.json(); // This should include extractedText for PDFs
   });
 
   try {
     const results = await Promise.all(uploadPromises);
     setUploadedFiles(prev => [...prev, ...results]);
   } catch (error) {
-    console.error('Upload error:', error);
-    alert('Failed to upload files');
+    console.error('Batch upload error:', error);
   }
 };
 

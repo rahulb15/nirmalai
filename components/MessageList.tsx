@@ -1,3 +1,4 @@
+// components\MessageList.tsx
 'use client';
 
 import { Message } from '@/types';

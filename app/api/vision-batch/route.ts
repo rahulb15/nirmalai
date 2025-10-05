@@ -1,4 +1,4 @@
-// app/api/vision-batch/route.ts - New endpoint for parallel processing
+// app\api\vision-batch\route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { openai, MODELS } from '@/lib/openai';
 
