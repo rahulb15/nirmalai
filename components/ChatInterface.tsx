@@ -129,6 +129,43 @@ export default function ChatInterface() {
 // };
 
 
+// Add this before handleSendMessage function
+const fetchWithRetry = async (url: string, options: RequestInit, retries = 2) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // Check if we got JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error(`Attempt ${i + 1}: Non-JSON response:`, text.substring(0, 200));
+        
+        if (i === retries - 1) {
+          throw new Error('Server returned HTML instead of JSON. Please check server logs and try again.');
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+      
+      return response;
+      
+    } catch (error: any) {
+      console.error(`Attempt ${i + 1} failed:`, error.message);
+      
+      if (i === retries - 1) {
+        throw error;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  
+  throw new Error('All retry attempts failed');
+};
+
 const handleSendMessage = async (content: string) => {
   if (!content.trim() && uploadedFiles.length === 0) return;
 
@@ -190,52 +227,48 @@ const handleSendMessage = async (content: string) => {
       }]);
     }
     else if (allImageUrls.length > 0) {
-      // Choose endpoint based on number of images
-      const endpoint = allImageUrls.length > 5 ? '/api/vision-batch' : '/api/vision';
-      
-      console.log(`Using ${endpoint} for ${allImageUrls.length} images`);
-      
-      // Update progress
-      if (allImageUrls.length > 10) {
-        setProcessingProgress(`Processing ${allImageUrls.length} pages in parallel...`);
-      } else if (allImageUrls.length > 5) {
-        setProcessingProgress(`Processing ${allImageUrls.length} images in parallel batches...`);
-      }
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrls: allImageUrls,
-          prompt: content || 'Analyze these images and extract all text and information',
-        }),
-      });
-
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response from vision API:', text.substring(0, 500));
-        throw new Error('Server error: Received HTML instead of JSON. The AI service may be overloaded. Please try again.');
-      }
-      
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      
-      let responseContent = data.description;
-      if (data.strategy === 'sampling') {
-        responseContent += `\n\n⚡ **Fast Analysis**: Analyzed ${data.analyzedPages} key pages out of ${data.totalPages} total pages.`;
-      } else if (data.totalPages > 5) {
-        responseContent += `\n\n✅ **Complete Analysis**: Successfully processed all ${data.totalPages} pages.`;
-      }
-      
-      setMessages(prev => [...prev, {
-        id: generateId(),
-        role: 'assistant',
-        content: responseContent,
-        timestamp: new Date(),
-      }]);
+  const endpoint = allImageUrls.length > 5 ? '/api/vision-batch' : '/api/vision';
+  
+  console.log(`Using ${endpoint} for ${allImageUrls.length} images`);
+  
+  if (allImageUrls.length > 10) {
+    setProcessingProgress(`Processing ${allImageUrls.length} pages... This may take 2-3 minutes.`);
+  } else if (allImageUrls.length > 5) {
+    setProcessingProgress(`Processing ${allImageUrls.length} images in batches...`);
+  }
+  
+  try {
+    const response = await fetchWithRetry(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrls: allImageUrls,
+        prompt: content || 'Analyze these images and extract all text and information',
+      }),
+    });
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    let responseContent = data.description;
+    
+    if (data.errorCount > 0) {
+      responseContent += `\n\n⚠️ ${data.errorCount} page(s) had processing errors.`;
+    } else if (data.totalPages > 5) {
+      responseContent += `\n\n✅ Successfully processed all ${data.totalPages} pages.`;
     }
+    
+    setMessages(prev => [...prev, {
+      id: generateId(),
+      role: 'assistant',
+      content: responseContent,
+      timestamp: new Date(),
+    }]);
+    
+  } catch (visionError: any) {
+    throw new Error(`Vision API error: ${visionError.message}`);
+  }
+}
     else {
       // Regular chat
       const response = await fetch('/api/chat', {
