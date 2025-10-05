@@ -294,34 +294,43 @@ const handleFileUpload = async (files: File[]) => {
     formData.append('file', file);
 
     try {
+      console.log(`Uploading ${file.name}...`);
+      
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
 
+      // Check content type
+      const contentType = response.headers.get('content-type');
+      console.log('Response content-type:', contentType);
+
+      if (!contentType || !contentType.includes('application/json')) {
+        // Server returned HTML instead of JSON
+        const text = await response.text();
+        console.error('Server returned HTML:', text.substring(0, 500));
+        
+        throw new Error('Server error: Received HTML instead of JSON. Check server logs.');
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
-        // ✅ Show detailed error with debug info
         const errorMsg = data.error || 'Upload failed';
-        const debugInfo = data.debug ? JSON.stringify(data.debug, null, 2) : '';
+        const debugMsg = data.debug ? `\n\nDebug: ${JSON.stringify(data.debug, null, 2)}` : '';
         
-        console.error('Upload failed:', {
-          error: errorMsg,
-          debug: data.debug,
-          status: response.status
-        });
-        
-        // Show user-friendly alert with technical details
-        alert(`Upload Failed\n\n${errorMsg}\n\n${debugInfo ? `Debug Info:\n${debugInfo}` : ''}`);
+        console.error('Upload failed:', data);
+        alert(`Upload Failed\n\n${errorMsg}${debugMsg}`);
         
         throw new Error(errorMsg);
       }
 
+      console.log('Upload success:', file.name);
       return data;
+
     } catch (error: any) {
       console.error('Upload error:', error);
-      alert(`Error uploading ${file.name}:\n${error.message}`);
+      alert(`Error: ${file.name}\n\n${error.message}`);
       throw error;
     }
   });
@@ -330,7 +339,7 @@ const handleFileUpload = async (files: File[]) => {
     const results = await Promise.all(uploadPromises);
     setUploadedFiles(prev => [...prev, ...results]);
   } catch (error) {
-    console.error('Batch upload error:', error);
+    console.error('Batch upload failed:', error);
   }
 };
 
