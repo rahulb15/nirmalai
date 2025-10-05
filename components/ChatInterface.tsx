@@ -169,6 +169,15 @@ const handleSendMessage = async (content: string) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: content }),
       });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response from generate-image:', text.substring(0, 500));
+        throw new Error('Server returned HTML instead of JSON. Check server logs.');
+      }
+
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       
@@ -186,14 +195,12 @@ const handleSendMessage = async (content: string) => {
       
       console.log(`Using ${endpoint} for ${allImageUrls.length} images`);
       
-      // Update progress based on strategy
+      // Update progress
       if (allImageUrls.length > 10) {
-        setProcessingProgress(`Using smart sampling for ${allImageUrls.length} pages - analyzing key pages...`);
+        setProcessingProgress(`Processing ${allImageUrls.length} pages in parallel...`);
       } else if (allImageUrls.length > 5) {
         setProcessingProgress(`Processing ${allImageUrls.length} images in parallel batches...`);
       }
-      const useCompleteAnalysis = allImageUrls.length <= 20; // Full analysis for 20 or fewer pages
-
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -201,18 +208,25 @@ const handleSendMessage = async (content: string) => {
         body: JSON.stringify({
           imageUrls: allImageUrls,
           prompt: content || 'Analyze these images and extract all text and information',
-              forceComplete: useCompleteAnalysis // New parameter
         }),
       });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response from vision API:', text.substring(0, 500));
+        throw new Error('Server error: Received HTML instead of JSON. The AI service may be overloaded. Please try again.');
+      }
       
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       
       let responseContent = data.description;
       if (data.strategy === 'sampling') {
-        responseContent += `\n\n⚡ **Fast Analysis**: Analyzed ${data.analyzedPages} key pages out of ${data.totalPages} total pages for quick overview. For complete analysis, upload fewer pages at a time.`;
+        responseContent += `\n\n⚡ **Fast Analysis**: Analyzed ${data.analyzedPages} key pages out of ${data.totalPages} total pages.`;
       } else if (data.totalPages > 5) {
-        responseContent += `\n\n⚡ **Parallel Processing**: Successfully processed all ${data.totalPages} pages using batch analysis.`;
+        responseContent += `\n\n✅ **Complete Analysis**: Successfully processed all ${data.totalPages} pages.`;
       }
       
       setMessages(prev => [...prev, {
@@ -234,6 +248,15 @@ const handleSendMessage = async (content: string) => {
           ]
         }),
       });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response from chat:', text.substring(0, 500));
+        throw new Error('Server returned HTML instead of JSON. Check server logs.');
+      }
+      
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       
@@ -241,10 +264,11 @@ const handleSendMessage = async (content: string) => {
     }
     
   } catch (error: any) {
+    console.error('Chat error:', error);
     setMessages(prev => [...prev, {
       id: generateId(),
       role: 'assistant',
-      content: `Error: ${error.message}`,
+      content: `❌ Error: ${error.message}`,
       timestamp: new Date(),
     }]);
   } finally {
@@ -252,6 +276,8 @@ const handleSendMessage = async (content: string) => {
     setProcessingProgress('');
   }
 };
+
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });

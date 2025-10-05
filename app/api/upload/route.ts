@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
         console.log(`Pages: ${pageCount}`);
 
         // Generate URLs - limit to 15 pages for performance
-        const maxPages = Math.min(pageCount, 15);
+        const maxPages = pageCount; // Process all pages in the PDF
         const pdfImages = [];
 
         for (let i = 1; i <= maxPages; i++) {
